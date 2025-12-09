@@ -11,7 +11,7 @@ in {
     ./boot
     ./bootstrap
     ./cache.nix
-    ./filesystem.nix
+#    ./filesystem.nix
     ./wireless
   ];
 
