@@ -9,8 +9,12 @@
   orangepi5 = pkgs.callPackage ./orangepi5 pkgsArgs;
 in {
   inherit (bananaPiR3) armTrustedFirmwareMT7986 linuxPackages_latest_bananaPiR3 linuxPackages_6_16_bananaPiR3 ubootBananaPiR3 linuxPackages_6_16_bananaPiR3_minimal;
-  inherit (bananaPiR4) armTrustedFirmwareMT7988 linuxPackages_frankw_latest_bananaPiR4 linuxPackages_frankw_6_12_bananaPiR4 ubootBananaPiR4;
+  inherit (bananaPiR4)
+    armTrustedFirmwareMT7988 armTrustedFirmwareMT7988Emmc armTrustedFirmwareMT7988Ram
+    linuxPackages_frankw_latest_bananaPiR4 linuxPackages_frankw_6_12_bananaPiR4
+    ubootBananaPiR4 ubootBananaPiR4Emmc ubootBananaPiR4Ram;
   inherit (pine64rock64) ubootRock64 ubootRock64v2;
   inherit (raspberrypi) ubootRaspberryPi4 raspberryPiFirmware;
   inherit (orangepi5) ubootOrangePi5 ubootOrangePi5b;
+  mtk_uartboot = pkgs.callPackage ./mtk_uartboot {};
 }

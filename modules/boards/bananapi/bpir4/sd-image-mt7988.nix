@@ -1,10 +1,12 @@
 {
   config,
+  lib,
   pkgs,
   sbcPkgs,
   ...
 }:
 {
+  config = lib.mkIf (config.sbc.board.bananapi.bpir4.bootMedium == "sd") {
   system.build.sdImage = pkgs.callPackage (
     {
       stdenv,
@@ -92,4 +94,5 @@
         '';
       }
   ) {uboot = sbcPkgs.ubootBananaPiR4;};
+  };
 }
