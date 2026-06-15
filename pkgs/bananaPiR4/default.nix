@@ -111,6 +111,14 @@
       '';
       extraConfig = ''
         CONFIG_ENV_SOURCE_FILE="mt7988-nixos"
+        # frank-w's defconfig builds its default env from uEnv_r4.txt via
+        # CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE, which overrides CONFIG_ENV_SOURCE_FILE
+        # and ships FIT-boot vars without kernel_addr_r/fdt_addr_r/ramdisk_addr_r/
+        # fdtfile. Disable it so our mt7988-nixos.env is the default env (as on the
+        # SD variant); without these vars U-Boot's extlinux boot fails with
+        # "missing environment variable: kernel_addr_r" and falls back to the wrong
+        # control FDT, resetting the kernel.
+        # CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE is not set
         CONFIG_DEFAULT_FDT_FILE="mediatek/mt7988a-bananapi-bpi-r4.dtb"
         CONFIG_SYS_BOOTM_LEN=0x6000000
         CONFIG_BOARD_LATE_INIT=y
@@ -178,6 +186,14 @@
       '';
       extraConfig = ''
         CONFIG_ENV_SOURCE_FILE="mt7988-nixos"
+        # frank-w's defconfig builds its default env from uEnv_r4.txt via
+        # CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE, which overrides CONFIG_ENV_SOURCE_FILE
+        # and ships FIT-boot vars without kernel_addr_r/fdt_addr_r/ramdisk_addr_r/
+        # fdtfile. Disable it so our mt7988-nixos.env is the default env (as on the
+        # SD variant); without these vars U-Boot's extlinux boot fails with
+        # "missing environment variable: kernel_addr_r" and falls back to the wrong
+        # control FDT, resetting the kernel.
+        # CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE is not set
         CONFIG_DEFAULT_FDT_FILE="mediatek/mt7988a-bananapi-bpi-r4.dtb"
         CONFIG_SYS_BOOTM_LEN=0x6000000
         CONFIG_BOARD_LATE_INIT=y
