@@ -63,9 +63,11 @@ nix build .#nixosConfigurations.<host>.config.system.build.uartRecovery -o recov
 
 ## Installing onto a blank eMMC
 
-The on-board eMMC ships blank, so the first install needs U-Boot loaded over UART
-(the BootROM falls back to UART download when the selected medium has no valid
-BL2). See [uart-recovery-INSTALL.md](./uart-recovery-INSTALL.md) for the full
+The first install loads U-Boot over UART. This works whether the eMMC is blank or
+already has a (possibly broken) bootloader: the MTK BootROM offers a UART download
+window at the very start of every power-on, and `mtk_uartboot` catches it before
+the eMMC is ever read — so you start the tool first, then power-cycle the board.
+See [uart-recovery-INSTALL.md](./uart-recovery-INSTALL.md) for the full
 step-by-step. In short:
 
 1. Write the eMMC `*.raw` image to a USB stick — this doubles as your recovery

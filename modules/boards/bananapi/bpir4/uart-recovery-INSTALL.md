@@ -42,18 +42,38 @@ cp result/firmware/bl2.img /path/to/fat/
 zstd -dc result/sd-image/nixos-emmc-*.raw.zst > /path/to/fat/emmc.raw
 ```
 
-## 1. Set SW3 to eMMC and power on
+## 1. Set SW3 to eMMC (leave the board powered OFF)
 
 SW3 = eMMC (per frank-w's wiki, "down = 1": A=1, B=0 — confirm against your
-board's silkscreen / revision). Because the eMMC is blank, the BootROM finds no
-valid BL2 and drops into UART download mode — the serial console stays silent.
-(If your board doesn't auto-fall-back, use the dedicated UART/BROM SW3 position.)
+board's silkscreen / revision).
 
-## 2. Push RAM U-Boot over UART
+> **The eMMC does NOT need to be blank.** The MTK BootROM offers a UART download
+> window at the very start of *every* power-on, before it reads any boot medium.
+> We catch that window in step 2 and take over, so whatever is already on the
+> eMMC (a prior bootloader, an old OpenWrt/vendor image, a half-finished install)
+> is irrelevant — `mtk_uartboot` works "even if the bootloader in flash is
+> completely broken". The trick is purely timing: the tool must be *waiting* when
+> the BootROM powers up.
+
+## 2. Push RAM U-Boot over UART (start the tool, THEN power on)
+
+Order matters. Start `mtk_uartboot` first — it opens the serial port and waits
+for the BootROM handshake — and only *then* apply power (or, if the board is
+already running, reset / power-cycle it):
+
+plug in usb uart into USB port
 
 ```bash
-./bin/mtk_uartboot -s /dev/ttyUSB0 -p bl2.bin --aarch64 -f fip.bin
+# start the loader and leave it waiting...
+sudo ./result-mtk-uartboot-x86_64/bin/mtk_uartboot -s /dev/ttyUSB0 \
+  -p result-ram-uboot/bl2.bin --aarch64 -f result-ram-uboot/fip.bin
+# ...then power on (or power-cycle) the BPI-R4 — the tool grabs the BootROM
 ```
+
+If it times out without connecting, the window was missed — just power the board
+off and try again: re-run the command, then re-apply power. (A too-quiet console
+means it's still waiting; a banner from an old bootloader means the BootROM got
+past the window and booted flash — power-cycle and retry.)
 
 It handshakes with the BROM, loads `bl2.bin` then `fip.bin` into RAM, and BL2
 starts U-Boot. Attach a console (mtk_uartboot may release the port when done):
@@ -65,8 +85,9 @@ tio /dev/ttyUSB0 -b 115200
 ## 3. Boot the USB NixOS
 
 With the stick inserted, U-Boot's `bootflow scan` (bootdev-order `usb`,`mmc0`)
-finds the USB NixOS and boots it (the blank eMMC is skipped). If it doesn't
-autoboot, interrupt U-Boot and run `bootflow scan -lb`. Log in over serial.
+tries USB first and boots the USB NixOS — so it wins over anything already on the
+eMMC. If it doesn't autoboot, interrupt U-Boot and run `bootflow scan -lb`. Log in
+over serial.
 
 > Why this works: USB is a separate bus from the MMC controller, so the
 > USB-booted system can see and write `/dev/mmcblk0` (the eMMC) directly.

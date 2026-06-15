@@ -10,6 +10,10 @@ in {
     environment.systemPackages = with pkgs; [
       # Provide git by default as it is required to work with flakes.
       git
+      # mmc-utils: needed to provision eMMC boot (e.g. `mmc bootpart enable 1 1
+      # /dev/mmcblk0` to set EXT_CSD BOOT_ACK/PARTITION_CONFIG) from the running
+      # install/recovery image.
+      mmc-utils
     ];
     nix.settings.experimental-features = ["nix-command" "flakes"];
 
