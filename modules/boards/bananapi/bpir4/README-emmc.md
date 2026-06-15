@@ -85,6 +85,28 @@ Keep the USB stick. If the eMMC OS breaks, insert it and power-cycle: U-Boot
 prefers USB, so you land in the known-good system, from which you can re-image the
 eMMC (`dd` / reinstall to `/dev/mmcblk0`). Pull the stick to go back to eMMC.
 
+### Build the recovery USB with a DISTINCT root UUID
+
+The ext4 root UUID is fixed (deterministic), so a USB written from the *same*
+image as the eMMC shares its root UUID. `root=…by-uuid/<uuid>` then resolves to
+whichever disk enumerates first (the eMMC), so the recovery USB would mount the
+**eMMC's** root — it can't override a broken eMMC, which defeats the point. Give
+the recovery image its own `sbc.filesystem.rootUUID`:
+
+```nix
+# a second host/config for the recovery medium:
+{
+  sbc.board.bananapi.bpir4.bootMedium = "emmc";   # keep the eMMC overlay so it can repair the eMMC
+  sbc.filesystem.rootUUID = "<a different UUID>";  # e.g. `uuidgen`
+}
+```
+
+Build that image, write it to the USB stick, and now each medium's initrd mounts
+only its own root: insert the USB → you truly boot the USB recovery OS (kernel +
+root both from USB) and can re-image the eMMC; remove it → the eMMC boots its own
+root. (The eMMC image keeps the default `rootUUID`, so the primary install is
+unchanged.)
+
 ## Status / caveats
 
 - Vendor kernel (frank-w 6.12 tree, same as the SD variant).

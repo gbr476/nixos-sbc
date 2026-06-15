@@ -70,7 +70,7 @@ in {
           storePaths = config.system.build.toplevel;
           compressImage = false;
           volumeLabel = "root";
-          uuid = "0b5e3376-c7e9-4284-9514-9c3b51244f19";
+          uuid = config.sbc.filesystem.rootUUID;
           populateImageCommands = ''
             mkdir ./files/boot
             ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
@@ -81,7 +81,7 @@ in {
           storePaths = config.system.build.toplevel;
           compressImage = false;
           volumeLabel = "root";
-          uuid = "18db6211-ac36-42c1-a22f-5e15e1486e0d";
+          uuid = config.sbc.filesystem.rootUUID;
           btrfs-progs = pkgs.btrfs-progs.overrideAttrs (oldAttrs: {
             patches = [
               ./mkfs-btrfs-force-root-ownership-and-time.patch
@@ -97,7 +97,7 @@ in {
           # FIXME: Nested subvols needs to assert or gain ordering logic.
           subvolMap = let
             # UUID is for BTRFS root device, not just subvol ones.  Ooops.
-            btrfsSubVolDevice = "/dev/disk/by-uuid/18db6211-ac36-42c1-a22f-5e15e1486e0d";
+            btrfsSubVolDevice = "/dev/disk/by-uuid/${config.sbc.filesystem.rootUUID}";
             fileSystems = builtins.filter (fs: ((fs.device == btrfsSubVolDevice) && (builtins.any (opt: lib.hasPrefix "subvol=" opt) fs.options))) config.system.build.fileSystems;
             stripSubVolOption = opt: lib.removePrefix "subvol=" opt;
             getSubVolOption = opts: stripSubVolOption (builtins.head (builtins.filter (opt: lib.hasPrefix "subvol=" opt) opts));

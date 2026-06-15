@@ -16,6 +16,28 @@ in {
         Options are false, "btrfs-subvol" "btrfs" or "ext4".
       '';
     };
+
+    rootUUID = mkOption {
+      type = types.str;
+      default =
+        if cfg.useDefaultLayout == "ext4"
+        then "0b5e3376-c7e9-4284-9514-9c3b51244f19"
+        else "18db6211-ac36-42c1-a22f-5e15e1486e0d";
+      defaultText = literalMD "the layout's historical fixed UUID";
+      description = mdDoc ''
+        UUID stamped on the default-layout root filesystem and referenced by
+        `fileSystems."/".device`. It is deliberately fixed (deterministic) so
+        the prebuilt image's `fileSystems` matches the bytes on disk.
+
+        Override it when building a SECOND image that may be present alongside
+        the primary install — most importantly a USB recovery medium for a
+        board that boots from eMMC. Both images otherwise share this UUID, so
+        `root=…by-uuid/<this>` resolves to whichever disk enumerates first
+        (the eMMC), and the recovery USB can't override a broken eMMC root.
+        Give the recovery image a distinct `rootUUID` and each medium's initrd
+        mounts only its own root.
+      '';
+    };
   };
 
   config = lib.mkMerge [
@@ -29,24 +51,24 @@ in {
     (lib.mkIf (config.sbc.enable && cfg.useDefaultLayout == "btrfs-subvol") {
       assertions = [
         {
-          assertion = builtins.all (fs: (fs.device == "/dev/disk/by-uuid/18db6211-ac36-42c1-a22f-5e15e1486e0d") -> !(builtins.any (opt: lib.hasPrefix "subvolid=" opt) fs.options)) config.system.build.fileSystems;
+          assertion = builtins.all (fs: (fs.device == "/dev/disk/by-uuid/${cfg.rootUUID}") -> !(builtins.any (opt: lib.hasPrefix "subvolid=" opt) fs.options)) config.system.build.fileSystems;
           message = "subvolid is not idempotent, can't reproduce, refusing to build";
         }
       ];
 
       fileSystems = {
         "/" = {
-          device = "/dev/disk/by-uuid/18db6211-ac36-42c1-a22f-5e15e1486e0d";
+          device = "/dev/disk/by-uuid/${cfg.rootUUID}";
           fsType = "btrfs";
           options = ["compress=zstd" "subvol=/@"];
         };
         "/boot" = {
-          device = "/dev/disk/by-uuid/18db6211-ac36-42c1-a22f-5e15e1486e0d";
+          device = "/dev/disk/by-uuid/${cfg.rootUUID}";
           fsType = "btrfs";
           options = ["compress=zstd" "subvol=/@boot"];
         };
         "/nix" = {
-          device = "/dev/disk/by-uuid/18db6211-ac36-42c1-a22f-5e15e1486e0d";
+          device = "/dev/disk/by-uuid/${cfg.rootUUID}";
           fsType = "btrfs";
           options = ["compress=zstd" "subvol=/@nix"];
         };
@@ -55,7 +77,7 @@ in {
     (lib.mkIf (config.sbc.enable && cfg.useDefaultLayout == "btrfs") {
       fileSystems = {
         "/" = {
-          device = "/dev/disk/by-uuid/18db6211-ac36-42c1-a22f-5e15e1486e0d";
+          device = "/dev/disk/by-uuid/${cfg.rootUUID}";
           fsType = "btrfs";
           options = ["compress=zstd"];
         };
@@ -64,7 +86,7 @@ in {
     (lib.mkIf (config.sbc.enable && cfg.useDefaultLayout == "ext4") {
       fileSystems = {
         "/" = {
-          device = "/dev/disk/by-uuid/0b5e3376-c7e9-4284-9514-9c3b51244f19";
+          device = "/dev/disk/by-uuid/${cfg.rootUUID}";
           fsType = "ext4";
         };
       };
