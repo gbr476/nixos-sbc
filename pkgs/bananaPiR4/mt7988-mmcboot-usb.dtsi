@@ -1,0 +1,20 @@
+/ {
+	bootstd {
+		compatible = "u-boot,boot-std";
+
+		filename-prefixes = "/@boot/", "/boot/", "/";
+		/*
+		 * eMMC-boot variant: prefer a recovery USB stick when present, then
+		 * fall back to the on-board eMMC (mmc0).  Lets "insert known-good USB +
+		 * power-cycle" boot the recovery OS without disturbing the eMMC install;
+		 * pull the stick and it boots eMMC.  (USB host/storage are enabled in
+		 * mt7988a_bpir4_emmc_defconfig, and bootstd's USB hunter runs `usb start`
+		 * during the scan.)
+		 */
+		bootdev-order = "usb", "mmc0";
+
+		extlinux {
+			compatible = "u-boot,extlinux";
+		};
+	};
+};

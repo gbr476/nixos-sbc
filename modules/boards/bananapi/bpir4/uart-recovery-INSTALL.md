@@ -1,133 +1,116 @@
 # BPI-R4 UART recovery → eMMC install
 
-Files in this bundle:
-- `bl2.bin`             — BL2 built with `BOOT_DEVICE=ram` (UART-loadable)
-- `fip.bin`             — FIP wrapping BL31 + U-Boot, ready for UART recovery
-- `bin/mtk_uartboot`    — MTK BootROM UART loader (third-party Rust port of MTK's protocol)
+First-time install of NixOS onto a **blank** BPI-R4 eMMC. The on-board eMMC has
+no bootloader, so we load U-Boot into RAM over the serial console, boot a NixOS
+from a USB stick, and write the eMMC from that running system. The microSD slot
+is never used (it shares the MMC controller with the eMMC — see
+[README-emmc.md](./README-emmc.md)).
 
-## What you also need (built separately)
+## What you need
 
-The eMMC artifacts from a `bootMedium = "emmc"` build of the same nixos-sbc:
+From this UART-recovery bundle (`system.build.uartRecovery`):
+- `bl2.bin`          — BL2 built `BOOT_DEVICE=ram` (UART-loadable, no BROM header)
+- `fip.bin`          — FIP (BL31 + U-Boot) for UART recovery
+- `bin/mtk_uartboot` — MTK BootROM UART loader
 
-- `<emmc-result>/firmware/bl2.img`       — destined for `/dev/mmcblk0boot0` (eMMC BL2 with BROM header)
-- `<emmc-result>/sd-image/*.raw.zst`     — decompress, write to `/dev/mmcblk0`
+From a `bootMedium = "emmc"` build (`system.build.sdImage`):
+- `firmware/bl2.img`     — eMMC BL2 (BROM header) → goes to `/dev/mmcblk0boot0`
+- `sd-image/*.raw.zst`   — the GPT image (FIP partition + ext4 root)
 
-## Procedure
+Plus: a USB stick, the USB-C serial console wired to the host (e.g.
+`/dev/ttyUSB0`), and an ethernet cable if you want to copy artifacts over the
+network instead of staging them on the stick.
 
-Run from your build host (e.g. fire-zfs) with the BPI-R4 connected over its
-USB-C console as `/dev/ttyUSB0`.
+## Prepare the USB recovery stick (on your host)
 
-### 1. Set SW3 to UART download mode
+Write the eMMC image straight to the stick — it is bootable (it carries the eMMC
+device tree) and becomes your permanent recovery medium:
 
-Power off the BPI-R4. Consult the silkscreen on the PCB next to SW3 for the
-"UART download" / "BROM" pattern (different from SD, eMMC, NAND, NOR).
-
-### 2. Apply power
-
-The board should be silent on the serial console — no banner, no anything.
-BROM is waiting for a UART payload.
-
-### 3. Push BL2 + FIP via UART
-
+```bash
+zstd -dc result/sd-image/nixos-emmc-*.raw.zst \
+  | sudo dd of=/dev/sdX bs=4M conv=fsync status=progress   # sdX = your USB stick
+sync
 ```
+
+Also copy the two install artifacts somewhere the booted NixOS can read them —
+simplest is a small extra FAT partition on the same stick, or just `scp` them
+over the network in step 5:
+
+```bash
+# bl2.img (boot0 BL2) and the raw image, for writing to eMMC later
+cp result/firmware/bl2.img /path/to/fat/
+zstd -dc result/sd-image/nixos-emmc-*.raw.zst > /path/to/fat/emmc.raw
+```
+
+## 1. Set SW3 to eMMC and power on
+
+SW3 = eMMC (per frank-w's wiki, "down = 1": A=1, B=0 — confirm against your
+board's silkscreen / revision). Because the eMMC is blank, the BootROM finds no
+valid BL2 and drops into UART download mode — the serial console stays silent.
+(If your board doesn't auto-fall-back, use the dedicated UART/BROM SW3 position.)
+
+## 2. Push RAM U-Boot over UART
+
+```bash
 ./bin/mtk_uartboot -s /dev/ttyUSB0 -p bl2.bin --aarch64 -f fip.bin
 ```
 
-`mtk_uartboot` will:
-1. Open `/dev/ttyUSB0` at 460800 baud, do BROM handshake.
-2. Push `bl2.bin` into RAM and start it.
-3. Re-negotiate to 921600 baud.
-4. Push `fip.bin` (BL31 + U-Boot) into RAM, BL2 takes over.
+It handshakes with the BROM, loads `bl2.bin` then `fip.bin` into RAM, and BL2
+starts U-Boot. Attach a console (mtk_uartboot may release the port when done):
 
-### 4. Attach serial console
-
-In a second terminal (mtk_uartboot keeps `/dev/ttyUSB0` open, so close it
-after step 3 completes):
-
-```
+```bash
 tio /dev/ttyUSB0 -b 115200
 ```
 
-You should land at the U-Boot prompt (`MT7988>` or similar).
+## 3. Boot the USB NixOS
 
-### 5. Load eMMC install artifacts into U-Boot
+With the stick inserted, U-Boot's `bootflow scan` (bootdev-order `usb`,`mmc0`)
+finds the USB NixOS and boots it (the blank eMMC is skipped). If it doesn't
+autoboot, interrupt U-Boot and run `bootflow scan -lb`. Log in over serial.
 
-Two paths — pick whichever fits your setup.
+> Why this works: USB is a separate bus from the MMC controller, so the
+> USB-booted system can see and write `/dev/mmcblk0` (the eMMC) directly.
 
-#### Option A: TFTP from fire-zfs
+## 4. Write the eMMC from the running NixOS
 
-On fire-zfs, run a TFTP server in the directory containing your eMMC
-artifacts. Easiest with `dnsmasq`:
+Make `bl2.img` and the raw image available (mount the FAT partition, or `scp`
+them from your host). Then:
 
-```
-sudo dnsmasq -d --enable-tftp --tftp-root=/path/to/emmc-result \
-             --port=0 --no-daemon
-```
+```bash
+# 4a. BL2 → eMMC hardware boot partition (boot0)
+echo 0 | sudo tee /sys/block/mmcblk0boot0/force_ro
+sudo dd if=bl2.img of=/dev/mmcblk0boot0 bs=512 conv=fsync status=progress
 
-Then connect the BPI-R4's WAN (or any working ethernet) to your LAN. From
-U-Boot:
+# 4b. GPT image (FIP partition + rootfs) → user area
+sudo dd if=emmc.raw of=/dev/mmcblk0 bs=4M conv=fsync status=progress
+#   (equivalently, clone the stick: dd if=/dev/sda of=/dev/mmcblk0 ...)
 
-```
-setenv ipaddr 192.168.x.y          # an unused address on your LAN
-setenv serverip 192.168.x.z        # fire-zfs's IP
-setenv autostart no
-tftpboot 0x46000000 firmware/bl2.img    # eMMC variant's BL2 (BROM header included)
-```
+# 4c. MANDATORY: enable the eMMC boot partition in EXT_CSD.
+#     boot_ack=1, boot_partition=1 (boot0). Without this the BootROM will NOT
+#     read BL2 from boot0 and the board stays silent.
+sudo mmc bootpart enable 1 1 /dev/mmcblk0
 
-`${filesize}` after the tftpboot tells you how many bytes were loaded —
-keep it in mind for the next step.
-
-#### Option B: USB stick
-
-Format a USB stick as FAT32, copy `bl2.bin` and the decompressed `.raw`
-image onto it, plug into the BPI-R4's USB-A port.
-
-```
-usb start
-fatload usb 0:1 0x46000000 bl2.bin
+sync
+sudo poweroff
 ```
 
-### 6. Write BL2 to the eMMC hardware boot partition
+## 5. Boot from eMMC
 
-```
-mmc dev 0 1                    # switch to /dev/mmcblk0boot0
-# bl2.bin is ~250 KB. Round up filesize to whole sectors (512 bytes):
-# blocks = (filesize + 511) / 512
-# In u-boot, easier: write a generous count.
-mmc write 0x46000000 0x0 0x200    # writes 0x200 sectors = 256 KB = enough for BL2
-```
+Remove the USB stick, leave SW3 on eMMC, power on. Watch the serial console for
+`BL2 → BL31 → U-Boot → kernel → NixOS getty`. Keep the USB stick — it's now your
+recovery medium (insert + power-cycle to boot it again).
 
-### 7. Write the GPT user-area image to mmcblk0
+## Troubleshooting
 
-```
-mmc dev 0 0                    # back to user area
-```
-
-For the decompressed `.raw` image you'd ideally need to load all 1.1 GB
-into RAM at once. U-Boot's DRAM is 4 GB so that fits, but loading 1.1 GB
-over TFTP is slow. Alternative: split the image into chunks and write
-sequentially with offsets. Or boot a small Linux from initramfs via TFTP
-and use `dd` there.
-
-The cleanest pragmatic path is Option B with the USB stick — `fatload usb`
-streams directly without filling RAM.
-
-### 8. Verify, power off, reboot from eMMC
-
-```
-mmc info                       # confirm sizes
-gpt verify mmc 0               # confirm GPT
-```
-
-Power off. Set SW3 to eMMC. Power on. Watch for BL2 → BL31 → U-Boot →
-kernel → NixOS getty.
-
-### If it doesn't boot
-
-- Flip SW3 back to UART download. You can re-enter recovery without
-  touching anything else.
-- The SD card with the original NixOS image is still untouched — flipping
-  SW3 to SD recovers that path.
-- Common pitfall: BL2 expects FIP at a specific offset on eMMC (sector
-  8192 in our image's GPT). If your image's `fip` partition isn't there,
-  BL2 will hang silently.
+- **Board silent after step 5 / won't reach U-Boot from eMMC.** Almost always a
+  missing step 4c (`mmc bootpart enable 1 1`), or BL2 not actually at `boot0`
+  offset 0. Re-enter UART recovery (steps 1–2) — it works regardless of eMMC
+  state — boot the USB NixOS, and redo 4a/4c.
+- **U-Boot comes up but no rootfs / kernel panic.** Confirm the eMMC overlay is
+  applied (the kernel must see an 8-bit `non-removable` mmc, not an SD card). The
+  build selects it automatically for `bootMedium = "emmc"`.
+- **BL2 reached but hangs before U-Boot.** ATF locates FIP by the GPT partition
+  named `fip`; make sure the image was written whole (step 4b) so that partition
+  exists.
+- **Need a clean redo.** UART recovery never depends on what's on the eMMC, so
+  you can always get back to a U-Boot prompt this way.

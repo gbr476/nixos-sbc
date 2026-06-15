@@ -1,0 +1,36 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "bananapi,bpi-r4", "mediatek,mt7988a";
+
+	fragment@0 {
+		target-path = "/soc/mmc@11230000";
+		__overlay__ {
+			/*
+			 * MT7988A has a single MMC controller (mmc@11230000) muxed
+			 * between the SD slot and the on-board eMMC; only one can be
+			 * active per boot.  This overlay configures it for eMMC and is
+			 * mutually exclusive with mt7988a-bananapi-bpi-r4-sd.dts — the
+			 * board module applies exactly one based on bootMedium.
+			 *
+			 * Values mirror frank-w/mainline mt7988a-bananapi-bpi-r4-emmc.dtso.
+			 */
+			pinctrl-names = "default", "state_uhs";
+			pinctrl-0 = <&mmc0_pins_emmc_51>;
+			pinctrl-1 = <&mmc0_pins_emmc_51>;
+			bus-width = <8>;
+			max-frequency = <200000000>;
+			cap-mmc-highspeed;
+			mmc-hs200-1_8v;
+			mmc-hs400-1_8v;
+			hs400-ds-delay = <0x12814>;
+			vmmc-supply = <&reg_3p3v>;
+			vqmmc-supply = <&reg_1p8v>;
+			non-removable;
+			no-sd;
+			no-sdio;
+			status = "okay";
+		};
+	};
+};

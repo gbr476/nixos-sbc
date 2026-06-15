@@ -101,14 +101,26 @@
       boot.initrd.availableKernelModules = ["nvme" "mmc_block"];
 
       hardware.deviceTree.filter = "mt7988a-bananapi-bpi-r4.dtb";
-      # Keep the SD overlay enabled regardless of bootMedium so a flipped SW3
-      # can boot from SD as a recovery medium without rebuilding.
-      hardware.deviceTree.overlays = [
-        {
-          name = "BananaPi bpir4 Enable SD card interface";
-          dtsFile = ./mt7988a-bananapi-bpi-r4-sd.dts;
-        }
-      ];
+      # The SD slot and eMMC share a single MMC controller (mmc@11230000); only
+      # one can be active per boot.  The SD overlay sets `no-mmc` (and 4-bit /
+      # 3.3V SD timing), which makes the eMMC un-enumerable — so eMMC boot MUST
+      # apply the eMMC overlay instead, never both.  Pick exactly one by
+      # bootMedium.  (This is why a single image can't boot both media: flipping
+      # SW3 also requires a DT built for that medium.)
+      hardware.deviceTree.overlays =
+        if config.sbc.board.bananapi.bpir4.bootMedium == "emmc"
+        then [
+          {
+            name = "BananaPi bpir4 Enable eMMC interface";
+            dtsFile = ./mt7988a-bananapi-bpi-r4-emmc.dts;
+          }
+        ]
+        else [
+          {
+            name = "BananaPi bpir4 Enable SD card interface";
+            dtsFile = ./mt7988a-bananapi-bpi-r4-sd.dts;
+          }
+        ];
     }
   ];
 }

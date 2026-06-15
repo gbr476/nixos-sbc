@@ -105,7 +105,9 @@
       extraNativeBuildInputs = [pkg-config ncurses armTrustedFirmwareTools xxd];
       postPatch = ''
         cp ${./mt7988-nixos.env} board/mediatek/mt7988/mt7988-nixos.env
-        cp ${./mt7988-mmcboot.dtsi} arch/arm/dts/nixos-mmcboot.dtsi
+        # USB-preferred boot order (usb, then mmc0) so a recovery USB stick wins
+        # over the eMMC primary OS when inserted.
+        cp ${./mt7988-mmcboot-usb.dtsi} arch/arm/dts/nixos-mmcboot.dtsi
       '';
       extraConfig = ''
         CONFIG_ENV_SOURCE_FILE="mt7988-nixos"
@@ -170,7 +172,9 @@
       extraNativeBuildInputs = [pkg-config ncurses armTrustedFirmwareTools xxd];
       postPatch = ''
         cp ${./mt7988-nixos.env} board/mediatek/mt7988/mt7988-nixos.env
-        cp ${./mt7988-mmcboot.dtsi} arch/arm/dts/nixos-mmcboot.dtsi
+        # Same USB-preferred boot order as the eMMC variant; the UART-recovered
+        # U-Boot is also what we use to drive the eMMC install from a USB stick.
+        cp ${./mt7988-mmcboot-usb.dtsi} arch/arm/dts/nixos-mmcboot.dtsi
       '';
       extraConfig = ''
         CONFIG_ENV_SOURCE_FILE="mt7988-nixos"
