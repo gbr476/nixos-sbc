@@ -77,5 +77,19 @@ in {
     zramSwap.enable = lib.mkDefault true;
 
     nix.settings.auto-optimise-store = lib.mkDefault true;
+
+    # Use systemd in the initrd — the modern NixOS stage-1. mkDefault so an
+    # individual board/host can fall back to scripted stage-1 if it doesn't yet
+    # boot under systemd-initrd (e.g. a minimal vendor kernel missing a config
+    # systemd needs). NOTE: only bpir4 has been validated on hardware so far;
+    # test each board before relying on this.
+    boot.initrd.systemd.enable = lib.mkDefault true;
+
+    # These images don't use LVM. Keep it out of the initrd so stage-1 doesn't
+    # run device-mapper tooling against a kernel that lacks the dm driver — the
+    # source of the harmless "/dev/mapper/control: open failed / Incompatible
+    # libdevmapper and kernel driver" noise. (With systemd-initrd this option
+    # otherwise defaults on, because services.lvm.enable defaults true.)
+    boot.initrd.services.lvm.enable = lib.mkDefault false;
   };
 }
