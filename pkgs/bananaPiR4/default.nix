@@ -8,7 +8,7 @@
   pkg-config,
   ubootTools,
   linuxKernel,
-  linux_6_12,
+  linux_6_18,
   lib,
   which,
   python3,
@@ -217,7 +217,7 @@
     });
 
 
-  linuxPackages_frankw_6_12_bananaPiR4 = linuxKernel.packagesFor (linux_6_12.override {
+  linuxPackages_frankw_6_18_bananaPiR4 = linuxKernel.packagesFor (linux_6_18.override {
     autoModules = false;
 
     ignoreConfigErrors = true;
@@ -398,12 +398,13 @@
       src = fetchFromGitHub {
         owner = "frank-w";
         repo = "BPI-Router-Linux";
-        # 6.12-main HEAD 2025-12-30
-        rev = "372986976784d1d4c593f217046162f9189c9713";
-        hash = "sha256-JGKa8dvOPoDimH5lY4SxXZnfBqRiGj/JxEpBT8dYTTM=";
+        # 6.18-main HEAD (rev pinned); Makefile VERSION=6.18 SUBLEVEL=23,
+        # defconfig CONFIG_LOCALVERSION="-bpi-r4" → kernelrelease 6.18.23-bpi-r4.
+        rev = "209592fa93923f30ad7eda7c96950b02a1f06cf7";
+        hash = "sha256-kVYnPiYsObILFPIkoahVCDcGIgtZPn4nqd4gQvJqy2c=";
       };
-      version = "6.12.63-bpi-r4";
-      modDirVersion = "6.12.63-bpi-r4";
+      version = "6.18.23-bpi-r4";
+      modDirVersion = "6.18.23-bpi-r4";
     };
 
     defconfig = "mt7988a_bpi-r4_defconfig";
@@ -411,5 +412,5 @@
     extraMeta.vendorKernel = true;
   });
 
-  linuxPackages_frankw_latest_bananaPiR4 = linuxPackages_frankw_6_12_bananaPiR4;
+  linuxPackages_frankw_latest_bananaPiR4 = linuxPackages_frankw_6_18_bananaPiR4;
 }
