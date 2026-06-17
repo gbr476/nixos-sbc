@@ -1,0 +1,23 @@
+/ {
+	bootstd {
+		compatible = "u-boot,boot-std";
+
+		filename-prefixes = "/@boot/", "/boot/", "/";
+		/*
+		 * Prefer a USB stick when present, then fall back to the microSD
+		 * (mmc0).  bpiR3 boots BL2+FIP+U-Boot from the microSD in both
+		 * cases, so "insert known-good USB + power-cycle" boots the USB OS
+		 * (chainloaded extlinux) without disturbing the SD install; pull
+		 * the stick and it boots the SD.  The MT7986 in-tree control DTB
+		 * (mt7986.dtsi) already enables xhci@11200000 + usbtphy
+		 * (status=okay); USB host/storage are turned on in
+		 * ubootBananaPiR3's extraConfig, and bootstd's USB hunter runs
+		 * `usb start` during the scan.
+		 */
+		bootdev-order = "usb", "mmc0";
+
+		extlinux {
+			compatible = "u-boot,extlinux";
+		};
+	};
+};

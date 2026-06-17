@@ -33,7 +33,9 @@ in rec {
       #
       # For now, work around issue by copying dtsi into tree and referencing
       # it in extraConfig using the relative path.
-      cp ${./mt7986-mmcboot.dtsi} arch/arm/dts/nixos-mmcboot.dtsi
+      # USB-preferred boot order ("usb", then mmc0) so a USB stick wins over the
+      # microSD's own root when inserted; pull it and U-Boot boots the SD.
+      cp ${./mt7986-mmcboot-usb.dtsi} arch/arm/dts/nixos-mmcboot.dtsi
     '';
     extraConfig = ''
       CONFIG_ENV_SOURCE_FILE="mt7986-nixos"
@@ -45,6 +47,19 @@ in rec {
       CONFIG_BOARD_LATE_INIT=y
       CONFIG_SHA1=y
       CONFIG_OF_BOARD_SETUP=y
+      # USB host + mass storage so `bootflow scan` can reach a USB bootdev before
+      # mmc0 (bootdev-order = "usb","mmc0" in mt7986-mmcboot-usb.dtsi). The MT7986
+      # in-tree control DTB (mt7986.dtsi, included by mt7986a-bpi-r3-sd.dts)
+      # already marks xhci@11200000 + usbtphy status=okay, so enabling these
+      # CONFIG symbols is sufficient — no DT overlay needed.
+      CONFIG_USB=y
+      CONFIG_USB_HOST=y
+      CONFIG_USB_XHCI_HCD=y
+      CONFIG_USB_XHCI_MTK=y
+      CONFIG_USB_STORAGE=y
+      CONFIG_CMD_USB=y
+      CONFIG_PHY=y
+      CONFIG_PHY_MTK_TPHY=y
     '';
     postBuild = ''
       fiptool create --soc-fw ${armTrustedFirmwareMT7986}/bl31.bin --nt-fw u-boot.bin fip.bin
