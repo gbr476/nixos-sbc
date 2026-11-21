@@ -5,6 +5,7 @@
   dtc,
   fetchFromGitHub,
   lib,
+  kernelPatches,
   linuxKernel,
   linux_6_18,
   ncurses,
@@ -128,7 +129,12 @@ in rec {
         patch = ./config_hsr_config_ordering.patch;
 
       }
-    ];
+    ]
+    # Overriding kernelPatches drops nixpkgs' default list, which on
+    # nixos-unstable carries the backport that lets tools/ (resolve_btfids)
+    # build against Linux >=7.3 arm64 UAPI headers using __u128. Re-add it
+    # where the nixpkgs in use provides it.
+    ++ lib.optional (kernelPatches ? tools_128bit_types) kernelPatches.tools_128bit_types;
 
     ignoreConfigErrors = true;
     structuredExtraConfig = with lib.kernel; {
