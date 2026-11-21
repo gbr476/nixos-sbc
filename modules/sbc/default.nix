@@ -83,7 +83,10 @@ in {
     # boot under systemd-initrd (e.g. a minimal vendor kernel missing a config
     # systemd needs). NOTE: only bpir4 has been validated on hardware so far;
     # test each board before relying on this.
-    boot.initrd.systemd.enable = lib.mkDefault true;
+    # nixos-unstable (26.11) removed scripted stage-1 and turned this option
+    # into a removed-option assertion, so any definition fails eval there;
+    # only set it on releases where it still exists.
+    boot.initrd.systemd.enable = lib.mkIf (lib.versionOlder lib.trivial.release "26.11") (lib.mkDefault true);
 
     # These images don't use LVM. Keep it out of the initrd so stage-1 doesn't
     # run device-mapper tooling against a kernel that lacks the dm driver — the
